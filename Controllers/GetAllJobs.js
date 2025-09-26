@@ -17,7 +17,6 @@ export default async function GetAllJobs(req, res) {
         const totalJobs = await JobModel.countDocuments({});
         console.log('GetAllJobs - Total jobs in collection:', totalJobs);
 
-        // Get all jobs for this user (excluding jobDescription for performance)
         let allJobs = await JobModel.find({ userID: userEmail }).select('-jobDescription');
         console.log(`GetAllJobs - Found ${allJobs.length} jobs for user: ${userEmail}`);
         

@@ -11,28 +11,35 @@ export default async function UpdateChanges(req, res) {
   }
 
   try {
-    if (action === "UpdateStatus") {
-      let currentStatus = await JobModel.findOne({ jobID, userID: userEmail });
+  if (action === "UpdateStatus") {
+      const current = await JobModel.findOne({ jobID, userID: userEmail });
+
+      const baseStatus = String(req.body?.status || "").trim();
+      const alreadyAttributed = /\sby\s/i.test(baseStatus);
+      const actorName = req.body?.role === 'operations' ? (userDetails?.name || 'operations') : 'user';
+      const statusToSet = alreadyAttributed || baseStatus === ''
+        ? baseStatus
+        : `${baseStatus} by ${actorName}`;
 
       await JobModel.findOneAndUpdate(
         { jobID, userID: userEmail },
         {
           $set: {
-            currentStatus: req.body?.status,
+            currentStatus: statusToSet,
             updatedAt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
           },
-          $push: { timeline: req.body?.status },
+          $push: { timeline: statusToSet },
         },
         { new: true, upsert: false }
       );
       const discordMessage =
   `📌 Job Update:
   Client: ${userDetails.name}
-   Company: ${currentStatus.companyName}
-   Job Title: ${currentStatus.jobTitle}
-   Status: ${req.body?.status}
-   Previous: ${currentStatus.currentStatus}`; 
-      if(req.body.status !== 'deleted')await DiscordConnect(process.env.DISCORD_APPLICATION_TRACKING_CHANNEL,discordMessage);
+   Company: ${current?.companyName}
+   Job Title: ${current?.jobTitle}
+   Status: ${statusToSet}
+   Previous: ${current?.currentStatus}`; 
+      if(baseStatus !== 'deleted') await DiscordConnect(process.env.DISCORD_APPLICATION_TRACKING_CHANNEL,discordMessage);
       
   }
     
@@ -64,21 +71,19 @@ export default async function UpdateChanges(req, res) {
   if (!existing) {
     return res.status(404).json({ message: "Job not found for this user" });
   }
+  const baseNextStatus = existing.currentStatus === "saved" ? "applied" : existing.currentStatus;
+  const opsName = req.body?.role === "operations" ? (req.body?.userDetails?.name || null) : null;
+  const nextStatus = opsName
+    ? `${baseNextStatus} by ${opsName}`
+    : (existing.currentStatus === "saved" ? "applied by user" : baseNextStatus);
 
   const update = {
     $set: {
       updatedAt: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+      currentStatus: nextStatus,
     },
-    // add attachments (no duplicates)
-    $addToSet: { attachments: { $each: attachmentUrls } },
+    $addToSet: { attachments: { $each: attachmentUrls }, timeline: nextStatus },
   };
-
-  // If it was "saved", flip to "applied" and record it on the timeline
-  if (existing.currentStatus === "saved") {
-    update.$set.currentStatus = "applied";
-    // use $addToSet to avoid duplicate "applied" in timeline
-    update.$addToSet.timeline = "applied";
-  }
 
   const updated = await JobModel.findOneAndUpdate(
     { jobID, userID: userEmail },

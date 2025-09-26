@@ -44,8 +44,8 @@ app.post("/google-oauth", GoogleOAuth);
 app.post("/refresh-token", RefreshToken);
 
 // Profile routes
-app.post("/setprofile", LocalTokenValidator, ProfileCheck, Add_Update_Profile);
-app.post("/upload-profile-file", LocalTokenValidator, upload.single('file'), uploadProfileFile);
+app.post("/setprofile", ProfileCheck, Add_Update_Profile);
+app.post("/upload-profile-file", upload.single('file'), uploadProfileFile);
 
 // Job routes
 app.post("/addjob", LocalTokenValidator, CheckForDuplicateJobs, AddJob);
