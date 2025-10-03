@@ -21,13 +21,28 @@ export default async function UpdateChanges(req, res) {
         ? baseStatus
         : `${baseStatus} by ${actorName}`;
 
+      // Check if operations user is moving job from saved to applied
+      let updateFields = {
+        currentStatus: statusToSet,
+        updatedAt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+      };
+
+      // Track operations when moving from saved to applied
+      if (req.body?.role === "operations" && current?.currentStatus === "saved" && statusToSet.includes("applied")) {
+        console.log("🔄 Operations tracking triggered - UpdateStatus action");
+        console.log("📊 Operations user:", req.body?.operationsName || userDetails?.name || 'operations');
+        
+        // Set operatorName to operations user name
+        updateFields.operatorName = req.body?.operationsName || userDetails?.name || 'operations';
+      } else if (req.body?.role !== "operations") {
+        // If not operations user, set to 'user'
+        updateFields.operatorName = 'user';
+      }
+
       await JobModel.findOneAndUpdate(
         { jobID, userID: userEmail },
         {
-          $set: {
-            currentStatus: statusToSet,
-            updatedAt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-          },
+          $set: updateFields,
           $push: { timeline: statusToSet },
         },
         { new: true, upsert: false }
@@ -77,11 +92,26 @@ export default async function UpdateChanges(req, res) {
     ? `${baseNextStatus} by ${opsName}`
     : (existing.currentStatus === "saved" ? "applied by user" : baseNextStatus);
 
+  // Check if operations user is moving job from saved to applied
+  let updateFields = {
+    updatedAt: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+    currentStatus: nextStatus,
+  };
+
+  // Track operations when moving from saved to applied
+  if (req.body?.role === "operations" && existing.currentStatus === "saved" && nextStatus.includes("applied")) {
+    console.log("🔄 Operations tracking triggered - edit action");
+    console.log("📊 Operations user:", req.body?.operationsName || userDetails?.name || 'operations');
+    
+    // Set operatorName to operations user name
+    updateFields.operatorName = req.body?.operationsName || userDetails?.name || 'operations';
+  } else if (req.body?.role !== "operations") {
+    // If not operations user, set to 'user'
+    updateFields.operatorName = 'user';
+  }
+
   const update = {
-    $set: {
-      updatedAt: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-      currentStatus: nextStatus,
-    },
+    $set: updateFields,
     $addToSet: { attachments: { $each: attachmentUrls }, timeline: nextStatus },
   };
 

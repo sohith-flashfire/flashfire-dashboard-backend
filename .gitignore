@@ -66,3 +66,4 @@ uploads/
 # Build outputs
 dist/
 build/
+.env
